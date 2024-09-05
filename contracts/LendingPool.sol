@@ -3,16 +3,20 @@ such as deposits, loans, interest accrual, borrow.
 */
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "./InterestRateModel.sol";
 import "./Oracle.sol";
 
 // LendingPool contract
 contract LendingPool {
+    struct Collateral {
+        address token; // address of the token
+        uint256 amount; // amount of the token
+    }
     mapping(address => uint256) public deposits; // a mapping of user deposits
     mapping(address => uint256) public loans; // a mapping of user loans
-    mapping(address => uint256) public collaterals; // a mapping of user collaterals
+    mapping(address => Collateral[]) public collaterals; // a mapping of user collaterals
 
     uint256 public totalBorrowed; // total amount borrowed from the protocol
     uint256 public totalSupply; // total amount deposited in the protocol
@@ -36,7 +40,10 @@ contract LendingPool {
         It increases the collateral of the user by the amount sent.
     */
     function depositCollateral() external payable {
-        collaterals[msg.sender] += msg.value; // increase the collateral of the user
+        collaterals[msg.sender].push(Collateral({
+            token: address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), // address of the token
+            amount: msg.value // amount of the token
+        }));
     }
 
     /** This function allows users to deposit funds into the protocol. 
@@ -51,7 +58,8 @@ contract LendingPool {
         It checks the collaterals of the user and handles the borrow.
     */
     function borrow(uint256 amount) external {
-        uint256 collateralValue = oracle.getCollateralValue(collaterals[msg.sender]); // get the value of the user's collaterals
+        require(amount > 0, "Invalid amount"); // check if the amount is greater than 0
+        uint256 collateralValue = oracle.getCollateralValue(collaterals[msg.sender][0].token, collaterals[msg.sender][0].amount); // get the value of the collaterals
         uint256 maxBorrow = (collateralValue * 1e18) / collateralizationRatio; // calculate the maximum amount that can be borrowed
 
         require(amount <= maxBorrow, "Insufficient collateral"); // check if the amount is less than the maximum borrow amount
@@ -85,7 +93,7 @@ contract LendingPool {
     /** This function is for the liquidation. It allows the liquidator to pay the loan of a borrower
         to get the collateral at a discount */
     function liquidate(address borrower) external payable {
-        uint256 collateralValue = oracle.getCollateralValue(collaterals[borrower]); // get the value of the user's collaterals
+        uint256 collateralValue = oracle.getCollateralValue(collaterals[borrower][0].token, collaterals[borrower][0].amount); // get the value of the borrower's collateral
         uint256 maxBorrow = (collateralValue * 1e18) / collateralizationRatio; // calculate the maximum amount that can be borrowed
         uint256 currentLoan = loans[borrower]; // get the current loan of the borrower
 
@@ -96,7 +104,7 @@ contract LendingPool {
         totalBorrowed -= msg.value; // decrease the total borrowed amount
 
         uint256 collateralToTransfer = (msg.value * collateralValue) / currentLoan; // calculate the amount of collateral to transfer
-        collaterals[borrower] -= collateralToTransfer; // decrease the collateral of the borrower
+        collaterals[borrower][0].amount -= collateralToTransfer; // decrease the collateral of the borrower
         payable(msg.sender).transfer(collateralToTransfer); // transfer the collateral to the liquidator
     }
 }

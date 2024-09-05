@@ -3,7 +3,7 @@ lending rates based on the utilization rates using a
 linear model. */
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 contract InterestRateModel {
     uint256 public baseRate; // the base rate if the utilization rate is 0
